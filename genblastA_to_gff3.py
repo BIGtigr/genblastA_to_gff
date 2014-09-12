@@ -8,6 +8,23 @@ import logging.config
 import json
 import os
 
+def write_gff(genomic_match, hsp_dict, query_name, output_file):
+	# gff3 format
+	# seq source type start end score strand phase attributes"
+	num_hsps = len(hsp_dict)
+	match_length = abs(int(genomic_match.group('match_end')) - int(genomic_match.group('match_start')))
+	avg_perc_identity = sum([hsp_dict[i]['perc_id'] for i in hsp_dict])/num_hsps
+	query_coverage_perc = float(genomic_match.group('coverage_perc'))
+	if (avg_perc_identity >= args.min_perc_identity and
+		query_coverage_perc >= args.min_perc_coverage and
+		match_length >= args.min_match_length):
+		attributes='ID={}_{}'.format(query_name, genomic_match.group('rank'))
+		gff_line = '\t'.join([genomic_match.group('match_name'), 'BLAST', 'match',
+							  genomic_match.group('match_start'), genomic_match.group('match_end'),
+							  genomic_match.group('score'), genomic_match.group('strand'),
+							  '.', attributes]) + '\n'
+		output_file.write(gff_line)
+
 log_config = os.getenv('LOG_CONFIG', None)
 if log_config:
 	log_config_file = None
@@ -50,21 +67,9 @@ for line in args.genblastA_file:
 	else:
 		# we're in a record
 		if line.startswith(end_str):
-			# gff3 format
-			# seq source type start end score strand phase attributes"
-			num_hsps = len(hsp_dict)
-			match_length = abs(int(genomic_match.group('match_end')) - int(genomic_match.group('match_start')))
-			avg_perc_identity = sum([hsp_dict[i]['perc_id'] for i in hsp_dict])/num_hsps
-			query_coverage_perc = float(genomic_match.group('coverage_perc'))
-			if (avg_perc_identity >= args.min_perc_identity and
-				query_coverage_perc >= args.min_perc_coverage and
-				match_length >= args.min_match_length):
-				attributes='ID={}_{}'.format(query_name, genomic_match.group('rank'))
-				gff_line = '\t'.join([genomic_match.group('match_name'), 'BLAST', 'match',
-									  genomic_match.group('match_start'), genomic_match.group('match_end'),
-									  genomic_match.group('score'), genomic_match.group('strand'),
-									  '.', attributes]) + '\n'
-				args.gff_file.write(gff_line)
+			# check that we've got a match to output (we might have NONE)
+			if genomic_match:
+				write_gff(genomic_match, hsp_dict, query_name, args.gff_file)
 			hsp_dict = dict()
 			genomic_match = None
 			query_name = ''
@@ -77,6 +82,11 @@ for line in args.genblastA_file:
 			else:
 				query_name = fields[2]
 		elif 'gene cover' in line:
+			if genomic_match:
+				# we've already seen one match, need to output that
+				write_gff(genomic_match, hsp_dict, query_name, args.gff_file)
+				# and reset the hsp_dict, we're about to reset the genomic_match
+				hsp_dict = dict()
 			genomic_match = genomic_match_re.match(line.rstrip())
 			if not genomic_match:
 				logging.error('Genomic match regexp failed to match on line: {}'.format(line))
