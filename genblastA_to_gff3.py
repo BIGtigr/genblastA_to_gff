@@ -15,8 +15,17 @@ HSP_STR = 'HSP_ID'
 GENOMIC_MATCH_RE = re.compile('^(?P<query_name>[^|]*)\|(?P<match_name>[^:]*):(?P<match_start>\d+)\.\.(?P<match_end>\d+)\|(?P<strand>[+-])\|gene cover:(?P<coverage_num>\d+)\((?P<coverage_perc>[\d.]+)%\)\|score:(?P<score>[-\d.]+)\|rank:(?P<rank>\d+)$')
 HSP_RE = re.compile('^HSP_ID\[(?P<hsp_id>\d+)\]:\((?P<match_start>\d+)-(?P<match_end>\d+)\);query:\((?P<query_start>\d+)-(?P<query_end>\d+)\); pid: (?P<perc_id>[\d.]+)$')
 
+
 def parse_genblastA(input_filename):
 	in_record = False
+	matches_by_query = dict()
+	def dict_from_match_re(genomic_match):
+		match_dict = genomic_match.groupdict()
+		match_index = matches_by_query.get(match_dict['query_name'], 0) + 1
+		match_dict['index'] = match_index
+		matches_by_query[match_dict['query_name']] = match_index
+		return match_dict
+
 	# variables set during parsing
 	hsp_dict = dict()
 	genomic_match = None
@@ -30,7 +39,8 @@ def parse_genblastA(input_filename):
 			if line.startswith(END_STR):
 				# check that we've got a match to output (we might have NONE)
 				if genomic_match:
-					yield(dict(match=genomic_match, hsps=hsp_dict))
+					match_dict = dict_from_match_re(genomic_match)
+					yield(dict(match=match_dict, hsps=hsp_dict))
 				hsp_dict = dict()
 				genomic_match = None
 				query_name = ''
@@ -45,7 +55,8 @@ def parse_genblastA(input_filename):
 			elif 'gene cover' in line:
 				if genomic_match:
 					# we've already seen one match, need to output that
-					yield(dict(match=genomic_match, hsps=hsp_dict))
+					match_dict = dict_from_match_re(genomic_match)
+					yield(dict(match=match_dict, hsps=hsp_dict))
 					# and reset the hsp_dict, we're about to reset the genomic_match
 					hsp_dict = dict()
 				genomic_match = GENOMIC_MATCH_RE.match(line.rstrip())
@@ -72,16 +83,16 @@ def write_gff_line(genomic_match, hsp_dict, query_name, output_file):
 	# gff3 format
 	# seq source type start end score strand phase attributes"
 	num_hsps = len(hsp_dict)
-	match_length = abs(int(genomic_match.group('match_end')) - int(genomic_match.group('match_start')))
+	match_length = abs(int(genomic_match['match_end']) - int(genomic_match['match_start']))
 	avg_perc_identity = sum([hsp_dict[i]['perc_id'] for i in hsp_dict])/num_hsps
-	query_coverage_perc = float(genomic_match.group('coverage_perc'))
+	query_coverage_perc = float(genomic_match['coverage_perc'])
 	if (avg_perc_identity >= args.min_perc_identity and
 		query_coverage_perc >= args.min_perc_coverage and
 		match_length >= args.min_match_length):
-		attributes='ID={}_{}'.format(query_name, genomic_match.group('rank'))
-		gff_line = '\t'.join([genomic_match.group('match_name'), 'BLAST', 'match',
-							  genomic_match.group('match_start'), genomic_match.group('match_end'),
-							  genomic_match.group('score'), genomic_match.group('strand'),
+		attributes='ID={}_{}'.format(query_name, genomic_match['index'])
+		gff_line = '\t'.join([genomic_match['match_name'], 'genBlastA', 'match',
+							  genomic_match['match_start'], genomic_match['match_end'],
+							  genomic_match['coverage_perc'], genomic_match['strand'],
 							  '.', attributes]) + '\n'
 		output_file.write(gff_line)
 
@@ -110,4 +121,4 @@ args = parser.parse_args()
 
 args.gff_file.write('##gff-version 3\n')
 for match in parse_genblastA(args.genblastA_file):
-	write_gff_line(match['match'], match['hsps'], match['match'].group('query_name'), args.gff_file)
+	write_gff_line(match['match'], match['hsps'], match['match']['query_name'], args.gff_file)
