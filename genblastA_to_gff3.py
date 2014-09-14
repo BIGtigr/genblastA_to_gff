@@ -82,19 +82,21 @@ def parse_genblastA(input_filename):
 def write_gff_line(genomic_match, hsp_dict, query_name, output_file):
 	# gff3 format
 	# seq source type start end score strand phase attributes"
-	num_hsps = len(hsp_dict)
-	match_length = abs(int(genomic_match['match_end']) - int(genomic_match['match_start']))
-	avg_perc_identity = sum([hsp_dict[i]['perc_id'] for i in hsp_dict])/num_hsps
-	query_coverage_perc = float(genomic_match['coverage_perc'])
-	if (avg_perc_identity >= args.min_perc_identity and
-		query_coverage_perc >= args.min_perc_coverage and
-		match_length >= args.min_match_length):
-		attributes='ID={}_{}'.format(query_name, genomic_match['index'])
-		gff_line = '\t'.join([genomic_match['match_name'], 'genBlastA', 'match',
-							  genomic_match['match_start'], genomic_match['match_end'],
-							  genomic_match['coverage_perc'], genomic_match['strand'],
-							  '.', attributes]) + '\n'
-		output_file.write(gff_line)
+	attributes='ID={}_{}'.format(query_name, genomic_match['index'])	
+	gff_line = '\t'.join([genomic_match['match_name'], 'genBlastA', 'match',
+						  genomic_match['match_start'], genomic_match['match_end'],
+						  genomic_match['coverage_perc'], genomic_match['strand'],
+						  '.', attributes]) + '\n'
+	output_file.write(gff_line)
+
+def write_bed_line(genomic_match, hsp_dict, query_name, output_file):
+	# bed format
+	# chrom chromStart chromEnd name score strand [other optional fields, see http://genome.ucsc.edu/FAQ/FAQformat.html#format1]
+	# bed score is 0 to 1000 - here the coverage percentage is scaled to that range
+	name = '{}_{}'.format(query_name, genomic_match['index'])
+	bed_line = '\t'.join([genomic_match['match_name'], genomic_match['match_start'], genomic_match['match_end'],
+		                  name, str(float(genomic_match['coverage_perc'])*10), genomic_match['strand']]) + '\n'
+	output_file.write(bed_line)
 
 log_config = os.getenv('LOG_CONFIG', None)
 if log_config:
@@ -115,10 +117,28 @@ parser = argparse.ArgumentParser(description='parse genblastA output and produce
 parser.add_argument('--min_perc_coverage','-C', type=float, default=80.0, help='Minimum coverage of the query sequence')
 parser.add_argument('--min_match_length','-L', type=int, default=100, help='Shortest match length to accept')
 parser.add_argument('--min_perc_identity','-I', type=float, default=80.0, help='Minimum average % identity to accept')
+parser.add_argument('--output_format','-F', type=str, choices=['gff3', 'bed'], default='gff3', help='Output format: GFF3 or BED')
 parser.add_argument('genblastA_file', type=argparse.FileType(), help='genblastA format file')
-parser.add_argument('gff_file', nargs='?', type=argparse.FileType('w'), default=sys.stdout, help='GFF3 output file')
+parser.add_argument('output_file', nargs='?', type=argparse.FileType('w'), default=sys.stdout, help='GFF3 output file')
 args = parser.parse_args()
 
-args.gff_file.write('##gff-version 3\n')
+if args.output_format == 'gff3':
+	args.output_file.write('##gff-version 3\n')
 for match in parse_genblastA(args.genblastA_file):
-	write_gff_line(match['match'], match['hsps'], match['match']['query_name'], args.gff_file)
+	genomic_match = match['match']
+	hsp_dict = match['hsps']
+	num_hsps = len(hsp_dict)
+	match_length = abs(int(genomic_match['match_end']) - int(genomic_match['match_start']))
+	avg_perc_identity = sum([hsp_dict[i]['perc_id'] for i in hsp_dict])/num_hsps
+	query_coverage_perc = float(genomic_match['coverage_perc'])
+	if (avg_perc_identity >= args.min_perc_identity and
+		query_coverage_perc >= args.min_perc_coverage and
+		match_length >= args.min_match_length):
+		if args.output_format == 'gff3':
+			write_gff_line(match['match'], match['hsps'], match['match']['query_name'], args.output_file)
+		elif args.output_format == 'bed':
+			write_bed_line(match['match'], match['hsps'], match['match']['query_name'], args.output_file)
+		else:
+			sys.stderr.write('Unknown output format: {}\n'.format(args.output_format))
+			sys.exit(1)
+			
