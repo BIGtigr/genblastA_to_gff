@@ -94,7 +94,7 @@ def write_bed_line(genomic_match, hsp_dict, query_name, output_file):
 	# chrom chromStart chromEnd name score strand [other optional fields, see http://genome.ucsc.edu/FAQ/FAQformat.html#format1]
 	# bed score is 0 to 1000 - here the coverage percentage is scaled to that range
 	name = '{}_{}'.format(query_name, genomic_match['index'])
-	bed_line = '\t'.join([genomic_match['match_name'], genomic_match['match_start'], genomic_match['match_end'],
+	bed_line = '\t'.join([genomic_match['match_name'], int(genomic_match['match_start']-1), int(genomic_match['match_end']-1),
 		                  name, str(float(genomic_match['coverage_perc'])*10), genomic_match['strand']]) + '\n'
 	output_file.write(bed_line)
 
@@ -141,4 +141,3 @@ for match in parse_genblastA(args.genblastA_file):
 		else:
 			sys.stderr.write('Unknown output format: {}\n'.format(args.output_format))
 			sys.exit(1)
-			
