@@ -12,7 +12,7 @@ START_STR = '//*****************START'
 END_STR = '//******************END'
 QUERY_NAME_STR = '//for query: '
 HSP_STR = 'HSP_ID'
-GENOMIC_MATCH_RE = re.compile('^(?P<query_name>[^|]*)\|(?P<match_name>[^:]*):(?P<match_start>\d+)\.\.(?P<match_end>\d+)\|(?P<strand>[+-])\|gene cover:(?P<coverage_num>\d+)\((?P<coverage_perc>[\d.]+)%\)\|score:(?P<score>[-\d.]+)\|rank:(?P<rank>\d+)$')
+GENOMIC_MATCH_RE = re.compile('^(?P<query_name>[^|]*)\|(?P<match_name>[^:]*):(?P<match_start>\d+)\.\.(?P<match_end>\d+)\|(?P<strand>[+-])\|gene cover:(?P<coverage_num>\d+)\((?P<coverage_perc>[\d.]+)%\)\|score:(?P<score>[-\de.]+)\|rank:(?P<rank>\d+)$')
 HSP_RE = re.compile('^HSP_ID\[(?P<hsp_id>\d+)\]:\((?P<match_start>\d+)-(?P<match_end>\d+)\);query:\((?P<query_start>\d+)-(?P<query_end>\d+)\); pid: (?P<perc_id>[\d.]+)$')
 
 
