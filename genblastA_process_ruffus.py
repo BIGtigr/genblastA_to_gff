@@ -66,5 +66,4 @@ def make_twobit(input_file, output_file):
 def make_index(input_file, output_file):
 	SeqIO.index_db(output_file, input_file, 'fasta')
 
-def run_exonerate(input_files, output_file, )
 pipeline_run(multiprocess=args.num_threads)
