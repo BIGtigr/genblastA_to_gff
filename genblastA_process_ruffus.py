@@ -2,16 +2,27 @@
 
 import sys
 import os
+import os.path
 import argparse
 import glob
+from subprocess import Popen, PIPE
+import shlex
 
 from ruffus import *
 from genblastA_to_gff3 import genblastA_process
+# import Environment Modules stuff
+MODULES_KEY = 'MODULESHOME'
+if MODULES_KEY in os.environ:
+	modules_init = os.path.join(os.environ[MODULES_KEY], init/python.py)
+	execfile(modules_init)
+	# need this for faToTwoBit
+	module('load', 'blat/default')
 
 parser = argparse.ArgumentParser(description='Use Ruffus to process .out files from genblastA')
 parser.add_argument('--input_pattern', '-I', default='.out')
 parser.add_argument('--working_directory', '-W', default='.')
 parser.add_argument('--num_threads', '-N', type=int, default=1)
+parser.add_argument('genome_filename', help='FASTA format genome file, must end in .fa or .fasta')
 args = parser.parse_args()
 
 os.chdir(args.working_directory)
@@ -32,5 +43,17 @@ def genblastA_to_gff3(input_file, output_file):
 	in_file = safe_open(input_file)
 	out_file = safe_open(output_file, 'w')
 	genblastA_process(in_file, out_file, min_perc_coverage=80.0)
+
+@transform(args.genome_filename,
+	       regex('\.(fa|fasta)$'),
+	       '.2bit')
+def make_twobit(input_file, output_file):
+	cmdline = 'faToTwoBit -noMask {} {}'.format(input_file, output_file)
+	cmdline_list = shlex.split(cmdline)
+	proc = Popen(cmdline_list, stdout=PIPE, stderr=PIPE)
+	(output, error) = proc.communicate()
+	retcode = proc.wait()
+	if (retcode != 0):
+		sys.stderr.write('Failed to run faToTwoBit (cmdline: {}): output:\n{}\nerror:{}\n'.format(cmdline, output, error))
 
 pipeline_run(multiprocess=args.num_threads)
