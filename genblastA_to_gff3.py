@@ -101,46 +101,51 @@ def write_bed_line(genomic_match, hsp_dict, query_name, output_file):
 		                  name, str(float(genomic_match['coverage_perc'])*10), genomic_match['strand']]) + '\n'
 	output_file.write(bed_line)
 
-log_config = os.getenv('LOG_CONFIG', None)
-if log_config:
-	log_config_file = None
-	try:
-		log_config_file = open(log_config)
-	except IOError as e:
-		sys.stderr.write('Failed to load logging config from {}: {}\n'.format(log_config, str(e)))
-	if log_config_file:
-		config_dict = json.load(log_config_file)
+def genblastA_process(input_file, output_file, output_format='gff3', min_perc_coverage=0.0, min_match_length=0, min_perc_identity=0):
+	if output_format == 'gff3':
+		output_file.write('##gff-version 3\n')
+	for match in parse_genblastA(input_file):
+		genomic_match = match['match']
+		hsp_dict = match['hsps']
+		num_hsps = len(hsp_dict)
+		match_length = abs(int(genomic_match['match_end']) - int(genomic_match['match_start']))
+		avg_perc_identity = sum([hsp_dict[i]['perc_id'] for i in hsp_dict])/num_hsps
+		query_coverage_perc = float(genomic_match['coverage_perc'])
+		if (avg_perc_identity >= min_perc_identity and
+			query_coverage_perc >= min_perc_coverage and
+			match_length >= min_match_length):
+			if output_format == 'gff3':
+				write_gff_line(match['match'], match['hsps'], match['match']['query_name'], output_file)
+			elif output_format == 'bed':
+				write_bed_line(match['match'], match['hsps'], match['match']['query_name'], output_file)
+			else:
+				sys.stderr.write('Unknown output format: {}\n'.format(args.output_format))
+				sys.exit(1)
+
+if __name__ == '__main__':
+	log_config = os.getenv('LOG_CONFIG', None)
+	if log_config:
+		log_config_file = None
 		try:
-			logging.config.dictConfig(config_dict)
-		except (ValueError, TypeError, AttributeError, ImportError) as e:
-			sys.stderr.write('Failed to parse log config dictionary: {}\n'.format(str(e)))
-			logging.basicConfig(level=logging.INFO)
+			log_config_file = open(log_config)
+		except IOError as e:
+			sys.stderr.write('Failed to load logging config from {}: {}\n'.format(log_config, str(e)))
+		if log_config_file:
+			config_dict = json.load(log_config_file)
+			try:
+				logging.config.dictConfig(config_dict)
+			except (ValueError, TypeError, AttributeError, ImportError) as e:
+				sys.stderr.write('Failed to parse log config dictionary: {}\n'.format(str(e)))
+				logging.basicConfig(level=logging.INFO)
 
-parser = argparse.ArgumentParser(description='parse genblastA output and produce GFF3')
-parser.add_argument('--min_perc_coverage','-C', type=float, default=80.0, help='Minimum coverage of the query sequence')
-parser.add_argument('--min_match_length','-L', type=int, default=100, help='Shortest match length to accept')
-parser.add_argument('--min_perc_identity','-I', type=float, default=80.0, help='Minimum average % identity to accept')
-parser.add_argument('--output_format','-F', type=str, choices=['gff3', 'bed'], default='gff3', help='Output format: GFF3 or BED')
-parser.add_argument('genblastA_file', type=argparse.FileType(), help='genblastA format file')
-parser.add_argument('output_file', nargs='?', type=argparse.FileType('w'), default=sys.stdout, help='GFF3 output file')
-args = parser.parse_args()
+	parser = argparse.ArgumentParser(description='parse genblastA output and produce GFF3')
+	parser.add_argument('--min_perc_coverage','-C', type=float, default=80.0, help='Minimum coverage of the query sequence')
+	parser.add_argument('--min_match_length','-L', type=int, default=100, help='Shortest match length to accept')
+	parser.add_argument('--min_perc_identity','-I', type=float, default=80.0, help='Minimum average % identity to accept')
+	parser.add_argument('--output_format','-F', type=str, choices=['gff3', 'bed'], default='gff3', help='Output format: GFF3 or BED')
+	parser.add_argument('genblastA_file', type=argparse.FileType(), help='genblastA format file')
+	parser.add_argument('output_file', nargs='?', type=argparse.FileType('w'), default=sys.stdout, help='GFF3 output file')
+	args = parser.parse_args()
 
-if args.output_format == 'gff3':
-	args.output_file.write('##gff-version 3\n')
-for match in parse_genblastA(args.genblastA_file):
-	genomic_match = match['match']
-	hsp_dict = match['hsps']
-	num_hsps = len(hsp_dict)
-	match_length = abs(int(genomic_match['match_end']) - int(genomic_match['match_start']))
-	avg_perc_identity = sum([hsp_dict[i]['perc_id'] for i in hsp_dict])/num_hsps
-	query_coverage_perc = float(genomic_match['coverage_perc'])
-	if (avg_perc_identity >= args.min_perc_identity and
-		query_coverage_perc >= args.min_perc_coverage and
-		match_length >= args.min_match_length):
-		if args.output_format == 'gff3':
-			write_gff_line(match['match'], match['hsps'], match['match']['query_name'], args.output_file)
-		elif args.output_format == 'bed':
-			write_bed_line(match['match'], match['hsps'], match['match']['query_name'], args.output_file)
-		else:
-			sys.stderr.write('Unknown output format: {}\n'.format(args.output_format))
-			sys.exit(1)
+	genblastA_process(args.genblastA_file, args.output_file, args.output_format, args.min_perc_coverage, 
+		             args.min_match_length, args.min_perc_identity)
