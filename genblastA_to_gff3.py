@@ -82,7 +82,10 @@ def parse_genblastA(input_filename):
 def write_gff_line(genomic_match, hsp_dict, query_name, output_file):
 	# gff3 format
 	# seq source type start end score strand phase attributes"
-	attributes='ID={}_{}'.format(query_name, genomic_match['index'])	
+	first_hsp_id = min(hsp_dict.keys())
+	last_hsp_id = max(hsp_dict.keys())
+	target = 'Target={} {} {}'.format(query_name, hsp_dict[first_hsp_id]['query_start'], hsp_dict[last_hsp_id]['query_end'])
+	attributes='ID={}_{};{}'.format(query_name, genomic_match['index'], target)	
 	gff_line = '\t'.join([genomic_match['match_name'], 'genBlastA', 'match',
 						  genomic_match['match_start'], genomic_match['match_end'],
 						  genomic_match['coverage_perc'], genomic_match['strand'],
