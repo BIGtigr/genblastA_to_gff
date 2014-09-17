@@ -12,6 +12,7 @@ START_STR = '//*****************START'
 END_STR = '//******************END'
 QUERY_NAME_STR = '//for query: '
 HSP_STR = 'HSP_ID'
+QUERY_NAME_RE = re.compile('^//for query: ([^/]*)//$')
 GENOMIC_MATCH_RE = re.compile('^(?P<query_name>[^|]*)\|(?P<match_name>[^:]*):(?P<match_start>\d+)\.\.(?P<match_end>\d+)\|(?P<strand>[+-])\|gene cover:(?P<coverage_num>\d+)\((?P<coverage_perc>[\d.]+)%\)\|score:(?P<score>[-\de.]+)\|rank:(?P<rank>\d+)$')
 HSP_RE = re.compile('^HSP_ID\[(?P<hsp_id>\d+)\]:\((?P<match_start>\d+)-(?P<match_end>\d+)\);query:\((?P<query_start>\d+)-(?P<query_end>\d+)\); pid: (?P<perc_id>[\d.]+)$')
 
@@ -46,12 +47,12 @@ def parse_genblastA(input_filename):
 				query_name = ''
 				in_record = False
 			elif line.startswith(QUERY_NAME_STR):
-				fields = line.split()
-				if len(fields) != 4:
-					logging.error('Got wrong number of fields ({} vs 4) in line: {}'.format(len(fields), line))
+				match = QUERY_NAME_RE.match(line.rstrip())
+				if match == None:
+					logging.error('Query name regexp failed to match on line: {}'.format(line))
 					in_record = False
 				else:
-					query_name = fields[2]
+					query_name = match.group(1)
 			elif 'gene cover' in line:
 				if genomic_match:
 					# we've already seen one match, need to output that
