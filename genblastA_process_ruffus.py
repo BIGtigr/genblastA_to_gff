@@ -13,7 +13,7 @@ from genblastA_to_gff3 import genblastA_process
 # import Environment Modules stuff
 MODULES_KEY = 'MODULESHOME'
 if MODULES_KEY in os.environ:
-	modules_init = os.path.join(os.environ[MODULES_KEY], init/python.py)
+	modules_init = os.path.join(os.environ[MODULES_KEY], 'init/python.py')
 	execfile(modules_init)
 	# need this for faToTwoBit
 	module('load', 'blat/default')
