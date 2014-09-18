@@ -122,6 +122,8 @@ def genblastA_process(input_file, output_file, output_format='gff3', min_perc_co
 			else:
 				sys.stderr.write('Unknown output format: {}\n'.format(args.output_format))
 				sys.exit(1)
+	input_file.close()
+	output_file.close()
 
 if __name__ == '__main__':
 	log_config = os.getenv('LOG_CONFIG', None)
